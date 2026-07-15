@@ -1,0 +1,135 @@
+:root {
+  --bg: #f7f7fb;
+  --card: #ffffff;
+  --ink: #1c1c28;
+  --muted: #6b7280;
+  --brand: #6d28d9;
+  --brand-dark: #5b21b6;
+  --border: #e5e7eb;
+  --ok: #16a34a;
+  --warn: #d97706;
+  --danger: #dc2626;
+  --radius: 14px;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 8px 24px rgba(0, 0, 0, 0.05);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+a { color: var(--brand); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.container { max-width: 1040px; margin: 0 auto; padding: 24px 20px; }
+
+/* Navbar */
+.nav {
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.nav-inner {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 0 20px;
+  height: 62px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+.brand { font-weight: 800; font-size: 20px; color: var(--brand); }
+.brand span { color: var(--ink); }
+.nav-spacer { flex: 1; }
+.nav a { color: var(--ink); font-weight: 500; }
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+  background: var(--brand);
+  color: #fff;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.15s;
+}
+.btn:hover { background: var(--brand-dark); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn.ghost { background: transparent; color: var(--brand); border: 1px solid var(--border); }
+.btn.ghost:hover { background: #f3f0fb; }
+.btn.danger { background: var(--danger); }
+.btn.sm { padding: 6px 12px; font-size: 13px; }
+
+/* Cards */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px;
+}
+.grid { display: grid; gap: 16px; }
+.grid.cols-3 { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+
+/* Forms */
+.field { margin-bottom: 14px; display: flex; flex-direction: column; gap: 6px; }
+label { font-size: 13px; font-weight: 600; color: var(--muted); }
+input, select {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 14px;
+  background: #fff;
+}
+input:focus, select:focus { outline: 2px solid #ddd6fe; border-color: var(--brand); }
+
+/* Salon card */
+.salon-card { cursor: pointer; transition: transform 0.12s, box-shadow 0.12s; }
+.salon-card:hover { transform: translateY(-2px); box-shadow: 0 12px 30px rgba(0,0,0,0.08); }
+.salon-thumb {
+  height: 140px; border-radius: 10px; margin-bottom: 12px;
+  background: linear-gradient(135deg, #a78bfa, #6d28d9);
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 34px; font-weight: 800;
+}
+
+/* Misc */
+.muted { color: var(--muted); }
+.row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.between { justify-content: space-between; }
+.tag {
+  font-size: 12px; background: #f3f0fb; color: var(--brand-dark);
+  padding: 3px 9px; border-radius: 999px; font-weight: 600;
+}
+.badge { font-size: 12px; padding: 3px 10px; border-radius: 999px; font-weight: 700; }
+.badge.pending { background: #fef3c7; color: var(--warn); }
+.badge.confirmed { background: #dcfce7; color: var(--ok); }
+.badge.cancelled { background: #fee2e2; color: var(--danger); }
+.badge.completed { background: #e0e7ff; color: #4338ca; }
+
+.slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 8px; }
+.slot {
+  padding: 8px; text-align: center; border: 1px solid var(--border);
+  border-radius: 8px; cursor: pointer; font-size: 13px; background: #fff;
+}
+.slot:hover { border-color: var(--brand); }
+.slot.selected { background: var(--brand); color: #fff; border-color: var(--brand); }
+.slot.disabled { opacity: 0.35; cursor: not-allowed; text-decoration: line-through; }
+
+.error { color: var(--danger); font-size: 14px; margin: 8px 0; }
+.center-card { max-width: 420px; margin: 60px auto; }
+h1 { font-size: 26px; margin: 0 0 6px; }
+h2 { font-size: 20px; }
+.title-row { margin-bottom: 20px; }

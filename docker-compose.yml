@@ -1,0 +1,214 @@
+# ============================================================
+# Salon Booking System — full local stack
+# Vertical slice: identity + catalogue + search + booking + payment
+# behind an API gateway, with Postgres / Mongo / Redis / RabbitMQ.
+#
+#   docker compose up --build
+# ============================================================
+
+x-postgres-env: &postgres-env
+  POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+  POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+  POSTGRES_USER: ${POSTGRES_USER:-salon}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-salon_pw}
+
+x-rabbit-env: &rabbit-env
+  RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
+  RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
+  RABBITMQ_USER: ${RABBITMQ_USER:-salon}
+  RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-salon_pw}
+  RABBITMQ_EXCHANGE: ${RABBITMQ_EXCHANGE:-salon.events}
+
+services:
+  # ---------------- Infrastructure ----------------
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-salon}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-salon_pw}
+      IDENTITY_DB: ${IDENTITY_DB:-identity_db}
+      BOOKING_DB: ${BOOKING_DB:-booking_db}
+      PAYMENT_DB: ${PAYMENT_DB:-payment_db}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infra/postgres/init-multiple-dbs.sh:/docker-entrypoint-initdb.d/init-multiple-dbs.sh
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-salon}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mongo:
+    image: mongo:7
+    ports:
+      - "${MONGO_HOST_PORT:-27018}:27017"
+    volumes:
+      - mongodata:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 20s
+      retries: 10
+      start_period: 40s
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "${REDIS_HOST_PORT:-6380}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-salon}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-salon_pw}
+    ports:
+      - "${RABBITMQ_HOST_PORT:-5673}:5672"
+      - "${RABBITMQ_UI_PORT:-15673}:15672"   # management UI
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+  # ---------------- Microservices ----------------
+  identity-service:
+    build: ./services/identity-service
+    environment:
+      <<: *postgres-env
+      NODE_ENV: development
+      PORT: ${IDENTITY_PORT:-3001}
+      POSTGRES_DB: ${IDENTITY_DB:-identity_db}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-dev_access_secret_change_me}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-dev_refresh_secret_change_me}
+      JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-900}
+      JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-1209600}
+    ports:
+      - "${IDENTITY_PORT:-3001}:${IDENTITY_PORT:-3001}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./services/identity-service/src:/app/src
+
+  catalogue-service:
+    build: ./services/catalogue-service
+    environment:
+      <<: *rabbit-env
+      NODE_ENV: development
+      PORT: ${CATALOGUE_PORT:-3002}
+      MONGO_URI: mongodb://${MONGO_HOST:-mongo}:${MONGO_PORT:-27017}/${CATALOGUE_DB:-catalogue_db}
+    ports:
+      - "${CATALOGUE_PORT:-3002}:${CATALOGUE_PORT:-3002}"
+    depends_on:
+      mongo:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./services/catalogue-service/src:/app/src
+
+  search-service:
+    build: ./services/search-service
+    environment:
+      <<: *rabbit-env
+      NODE_ENV: development
+      PORT: ${SEARCH_PORT:-3003}
+      MONGO_URI: mongodb://${MONGO_HOST:-mongo}:${MONGO_PORT:-27017}/${SEARCH_DB:-search_db}
+    ports:
+      - "${SEARCH_PORT:-3003}:${SEARCH_PORT:-3003}"
+    depends_on:
+      mongo:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./services/search-service/src:/app/src
+
+  booking-service:
+    build: ./services/booking-service
+    environment:
+      <<: [*postgres-env, *rabbit-env]
+      NODE_ENV: development
+      PORT: ${BOOKING_PORT:-3004}
+      POSTGRES_DB: ${BOOKING_DB:-booking_db}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      SLOT_LOCK_TTL_SECONDS: ${SLOT_LOCK_TTL_SECONDS:-600}
+      CATALOGUE_URL: http://catalogue-service:${CATALOGUE_PORT:-3002}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-dev_access_secret_change_me}
+    ports:
+      - "${BOOKING_PORT:-3004}:${BOOKING_PORT:-3004}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./services/booking-service/src:/app/src
+
+  payment-service:
+    build: ./services/payment-service
+    environment:
+      <<: [*postgres-env, *rabbit-env]
+      NODE_ENV: development
+      PORT: ${PAYMENT_PORT:-3005}
+      POSTGRES_DB: ${PAYMENT_DB:-payment_db}
+      PAYMENT_MOCK: ${PAYMENT_MOCK:-true}
+      PLATFORM_COMMISSION_PCT: ${PLATFORM_COMMISSION_PCT:-10}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-dev_access_secret_change_me}
+    ports:
+      - "${PAYMENT_PORT:-3005}:${PAYMENT_PORT:-3005}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./services/payment-service/src:/app/src
+
+  gateway:
+    build: ./gateway
+    environment:
+      NODE_ENV: development
+      PORT: ${GATEWAY_PORT:-8080}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-dev_access_secret_change_me}
+      IDENTITY_URL: http://identity-service:${IDENTITY_PORT:-3001}
+      CATALOGUE_URL: http://catalogue-service:${CATALOGUE_PORT:-3002}
+      SEARCH_URL: http://search-service:${SEARCH_PORT:-3003}
+      BOOKING_URL: http://booking-service:${BOOKING_PORT:-3004}
+      PAYMENT_URL: http://payment-service:${PAYMENT_PORT:-3005}
+    ports:
+      - "${GATEWAY_HOST_PORT:-8090}:${GATEWAY_PORT:-8080}"
+    depends_on:
+      - identity-service
+      - catalogue-service
+      - search-service
+      - booking-service
+      - payment-service
+    volumes:
+      - ./gateway/src:/app/src
+
+  frontend:
+    build: ./frontend
+    environment:
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8090}
+    ports:
+      - "${FRONTEND_HOST_PORT:-5174}:5173"
+    depends_on:
+      - gateway
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/index.html:/app/index.html
+
+volumes:
+  pgdata:
+  mongodata:
