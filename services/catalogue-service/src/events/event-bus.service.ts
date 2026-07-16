@@ -14,7 +14,7 @@ import * as amqp from 'amqplib';
 @Injectable()
 export class EventBusService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(EventBusService.name);
-  private connection: amqp.Connection;
+  private connection: any; // amqp ChannelModel — concrete type varies across amqplib versions
   private channel: amqp.Channel;
   private readonly exchange = process.env.RABBITMQ_EXCHANGE || 'salon.events';
 

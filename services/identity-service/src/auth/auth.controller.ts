@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  NotFoundException,
   Post,
   Req,
   UseGuards,
@@ -38,6 +39,7 @@ export class AuthController {
   @Get('me')
   async me(@Req() req: any) {
     const user = await this.users.findById(req.user.id);
+    if (!user) throw new NotFoundException('User not found');
     return this.auth.publicProfile(user);
   }
 }

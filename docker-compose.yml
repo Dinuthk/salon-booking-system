@@ -26,6 +26,10 @@ services:
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-salon}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-salon_pw}
+      # Default maintenance DB (must exist so the entrypoint + healthcheck can connect).
+      POSTGRES_DB: postgres
+      # Give first-time initdb extra time on slow disks (default is 60s).
+      PGCTLTIMEOUT: "180"
       IDENTITY_DB: ${IDENTITY_DB:-identity_db}
       BOOKING_DB: ${BOOKING_DB:-booking_db}
       PAYMENT_DB: ${PAYMENT_DB:-payment_db}
@@ -35,10 +39,11 @@ services:
       - pgdata:/var/lib/postgresql/data
       - ./infra/postgres/init-multiple-dbs.sh:/docker-entrypoint-initdb.d/init-multiple-dbs.sh
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-salon}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-salon} -d postgres"]
       interval: 10s
-      timeout: 5s
-      retries: 5
+      timeout: 10s
+      retries: 10
+      start_period: 60s
 
   mongo:
     image: mongo:7
@@ -68,14 +73,21 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-salon}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-salon_pw}
+      # Deterministic cookie written with correct 0600 perms by the entrypoint —
+      # works around the ".erlang.cookie: eacces" volume-permission issue on
+      # Docker Desktop for Windows.
+      RABBITMQ_ERLANG_COOKIE: ${RABBITMQ_ERLANG_COOKIE:-salon-dev-cookie}
     ports:
       - "${RABBITMQ_HOST_PORT:-5673}:5672"
       - "${RABBITMQ_UI_PORT:-15673}:15672"   # management UI
+    volumes:
+      - rabbitmqdata:/var/lib/rabbitmq
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 15s
       timeout: 10s
-      retries: 5
+      retries: 10
+      start_period: 60s
 
   # ---------------- Microservices ----------------
   identity-service:
@@ -212,3 +224,4 @@ services:
 volumes:
   pgdata:
   mongodata:
+  rabbitmqdata:
