@@ -80,6 +80,24 @@ export const authApi = {
     phone?: string;
     role?: string;
   }) => api.post('/auth/register', body).then((r) => r.data),
+  me: () => api.get('/auth/me').then((r) => r.data),
+  refresh: (refreshToken: string) =>
+    api.post('/auth/refresh', { refreshToken }).then((r) => r.data),
+};
+
+export interface OwnerAccount {
+  id: string;
+  email: string;
+  fullName: string;
+  status: 'active' | 'pending' | 'suspended';
+  createdAt: string;
+}
+
+// Admin: manage owner-account approval.
+export const usersApi = {
+  listOwners: () => api.get('/users/owners').then((r) => r.data as OwnerAccount[]),
+  setOwnerStatus: (id: string, status: 'active' | 'pending' | 'suspended') =>
+    api.patch(`/users/${id}/status`, { status }).then((r) => r.data),
 };
 
 // ---- Search & catalogue ----

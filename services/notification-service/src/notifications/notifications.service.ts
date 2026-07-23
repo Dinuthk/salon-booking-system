@@ -19,12 +19,25 @@ export class NotificationsService implements OnModuleInit {
   async onModuleInit() {
     await this.bus.subscribe(
       'notification.events',
-      ['booking.confirmed', 'booking.completed', 'booking.cancelled', 'slot.freed'],
+      ['booking.confirmed', 'booking.completed', 'booking.cancelled', 'slot.freed', 'owner.registered'],
       async (rk, p) => this.handle(rk, p),
     );
   }
 
   private async handle(routingKey: string, p: any): Promise<void> {
+    // Owner sign-up: alert every admin so they can review the request.
+    if (routingKey === 'owner.registered') {
+      for (const adminId of p.adminIds || []) {
+        await this.deliver(
+          adminId,
+          routingKey,
+          'New salon owner request 🔔',
+          `${p.fullName} (${p.email}) signed up as an owner and needs approval.`,
+          p,
+        );
+      }
+      return;
+    }
     const spec = this.render(routingKey, p);
     if (!spec) return;
     await this.deliver(spec.userId, routingKey, spec.title, spec.body, p);

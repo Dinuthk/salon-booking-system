@@ -12,7 +12,8 @@ import { UsersService } from '../users/users.service';
 import { UserRole } from '../common/roles.enum';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
-import { User } from '../users/user.entity';
+import { AccountStatus, User } from '../users/user.entity';
+import { EventBusService } from '../events/event-bus.service';
 
 @Injectable()
 export class AuthService implements OnModuleInit {
@@ -21,6 +22,7 @@ export class AuthService implements OnModuleInit {
   constructor(
     private readonly users: UsersService,
     private readonly jwt: JwtService,
+    private readonly bus: EventBusService,
   ) {}
 
   // Seed a platform admin (self-registration can't create admins).
@@ -46,6 +48,8 @@ export class AuthService implements OnModuleInit {
     if (existing) {
       throw new ConflictException('Email already registered');
     }
+    // Owners must be approved by an admin before they can operate.
+    const status = role === UserRole.OWNER ? AccountStatus.PENDING : AccountStatus.ACTIVE;
     const passwordHash = await bcrypt.hash(dto.password, 10);
     const user = await this.users.create({
       email: dto.email,
@@ -53,7 +57,18 @@ export class AuthService implements OnModuleInit {
       passwordHash,
       fullName: dto.fullName,
       role,
+      status,
     });
+
+    if (role === UserRole.OWNER) {
+      const admins = await this.users.findAdmins();
+      this.bus.publish('owner.registered', {
+        ownerId: user.id,
+        fullName: user.fullName,
+        email: user.email,
+        adminIds: admins.map((a) => a.id),
+      });
+    }
     return this.buildAuthResponse(user);
   }
 
@@ -86,7 +101,7 @@ export class AuthService implements OnModuleInit {
   }
 
   private async buildAuthResponse(user: User) {
-    const claims = { sub: user.id, email: user.email, role: user.role };
+    const claims = { sub: user.id, email: user.email, role: user.role, status: user.status };
     const [accessToken, refreshToken] = await Promise.all([
       this.jwt.signAsync(claims, {
         secret: process.env.JWT_ACCESS_SECRET,
@@ -111,6 +126,7 @@ export class AuthService implements OnModuleInit {
       phone: user.phone,
       fullName: user.fullName,
       role: user.role,
+      status: user.status,
       twoFactorEnabled: user.twoFactorEnabled,
     };
   }

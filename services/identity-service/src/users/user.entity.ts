@@ -7,6 +7,12 @@ import {
 } from 'typeorm';
 import { UserRole } from '../common/roles.enum';
 
+export enum AccountStatus {
+  ACTIVE = 'active',
+  PENDING = 'pending', // owner awaiting admin approval
+  SUSPENDED = 'suspended',
+}
+
 @Entity('users')
 export class User {
   @PrimaryGeneratedColumn('uuid')
@@ -26,6 +32,10 @@ export class User {
 
   @Column({ type: 'enum', enum: UserRole, default: UserRole.CUSTOMER })
   role: UserRole;
+
+  // Owners start 'pending' until an admin approves; others are 'active'.
+  @Column({ type: 'enum', enum: AccountStatus, default: AccountStatus.ACTIVE })
+  status: AccountStatus;
 
   @Column({ default: false })
   twoFactorEnabled: boolean;

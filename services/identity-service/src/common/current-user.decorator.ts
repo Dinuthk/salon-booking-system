@@ -3,7 +3,6 @@ import { createParamDecorator, ExecutionContext, UnauthorizedException } from '@
 export interface GatewayUser {
   id: string;
   role: string;
-  status: string;
   email?: string;
 }
 
@@ -20,7 +19,6 @@ export const CurrentUser = createParamDecorator(
     return {
       id,
       role: req.headers['x-user-role'] || 'customer',
-      status: req.headers['x-user-status'] || 'active',
       email: req.headers['x-user-email'],
     };
   },

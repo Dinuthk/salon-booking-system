@@ -5,6 +5,7 @@ export interface AuthUser {
   email: string;
   fullName: string;
   role: 'customer' | 'owner' | 'staff' | 'admin';
+  status?: 'active' | 'pending' | 'suspended';
 }
 
 interface AuthState {
@@ -36,6 +37,13 @@ const authSlice = createSlice({
       state.refreshToken = action.payload.refreshToken;
       localStorage.setItem('auth', JSON.stringify(state));
     },
+    // Patch the cached profile (e.g. after an admin approves an owner).
+    updateUser(state, action: PayloadAction<Partial<AuthUser>>) {
+      if (state.user) {
+        state.user = { ...state.user, ...action.payload };
+        localStorage.setItem('auth', JSON.stringify(state));
+      }
+    },
     logout(state) {
       state.user = null;
       state.accessToken = null;
@@ -45,5 +53,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { setCredentials, setTokens, logout } = authSlice.actions;
+export const { setCredentials, setTokens, updateUser, logout } = authSlice.actions;
 export default authSlice.reducer;

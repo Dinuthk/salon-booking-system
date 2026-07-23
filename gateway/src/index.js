@@ -53,12 +53,14 @@ function proxy(prefix, target) {
       if (req.user) {
         proxyReq.setHeader('x-user-id', req.user.id);
         proxyReq.setHeader('x-user-role', req.user.role || 'customer');
+        proxyReq.setHeader('x-user-status', req.user.status || 'active');
         if (req.user.email) proxyReq.setHeader('x-user-email', req.user.email);
       }
       // Strip any client-supplied identity headers (spoofing guard).
       else {
         proxyReq.removeHeader('x-user-id');
         proxyReq.removeHeader('x-user-role');
+        proxyReq.removeHeader('x-user-status');
         proxyReq.removeHeader('x-user-email');
       }
     },
@@ -72,6 +74,7 @@ function proxy(prefix, target) {
 app.use((req, _res, next) => {
   delete req.headers['x-user-id'];
   delete req.headers['x-user-role'];
+  delete req.headers['x-user-status'];
   delete req.headers['x-user-email'];
   next();
 });
@@ -79,6 +82,9 @@ app.use((req, _res, next) => {
 // ---- Public routes ----
 app.use('/api/auth', proxy('auth', TARGETS.identity));
 app.use('/api/search', proxy('search', TARGETS.search));
+
+// Identity admin ops (owner approval) — protected, routed to identity service.
+app.use('/api/users', requireUser, proxy('users', TARGETS.identity));
 
 // ---- Mixed / protected routes ----
 // Bookings: availability is public; everything else requires auth.

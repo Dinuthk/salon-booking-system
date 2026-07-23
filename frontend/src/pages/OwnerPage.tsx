@@ -1,11 +1,49 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { salonApi, staffApi, bookingApi } from '../api/endpoints';
+import { useDispatch, useSelector } from 'react-redux';
+import { RootState } from '../store';
+import { setTokens, updateUser } from '../features/auth/authSlice';
+import { salonApi, staffApi, bookingApi, authApi } from '../api/endpoints';
 
 export default function OwnerPage() {
   const qc = useQueryClient();
-  const { data: salons } = useQuery({ queryKey: ['salons', 'mine'], queryFn: salonApi.mine });
+  const dispatch = useDispatch();
+  const user = useSelector((s: RootState) => s.auth.user);
+  const refreshToken = useSelector((s: RootState) => s.auth.refreshToken);
+
+  // Poll our own profile so an admin approval reflects without re-login.
+  const { data: profile } = useQuery({
+    queryKey: ['auth', 'me'],
+    queryFn: authApi.me,
+    refetchInterval: 5000,
+  });
+
+  // When our DB status changes (e.g. admin approval), refresh the JWT so the
+  // new status reaches downstream services, then update the cached profile.
+  useEffect(() => {
+    if (!profile || profile.status === user?.status) return;
+    (async () => {
+      try {
+        if (refreshToken) {
+          const t = await authApi.refresh(refreshToken);
+          dispatch(setTokens({ accessToken: t.accessToken, refreshToken: t.refreshToken }));
+        }
+      } catch {
+        /* ignore — will retry next poll */
+      }
+      dispatch(updateUser({ status: profile.status }));
+    })();
+  }, [profile?.status, user?.status, refreshToken, dispatch]);
+
+  const status = profile?.status ?? user?.status ?? 'active';
+  const approved = status === 'active';
+
+  const { data: salons } = useQuery({
+    queryKey: ['salons', 'mine'],
+    queryFn: salonApi.mine,
+    enabled: approved,
+  });
   const { data: myStaff } = useQuery({ queryKey: ['staff', 'mine'], queryFn: staffApi.mine });
   const { data: ownerBookings } = useQuery({
     queryKey: ['bookings', 'owner'],
@@ -45,6 +83,39 @@ export default function OwnerPage() {
       salonApi.addService(salonId, body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['salons', 'mine'] }),
   });
+
+  // Owner accounts must be approved by an admin before they can operate.
+  if (!approved) {
+    return (
+      <div className="container">
+        <div className="title-row">
+          <h1>Owner dashboard</h1>
+        </div>
+        <div className="card" style={{ borderColor: 'var(--warn)' }}>
+          {status === 'suspended' ? (
+            <>
+              <h2 style={{ marginTop: 0 }}>Account suspended ⛔</h2>
+              <p className="muted">
+                Your salon-owner account has been suspended by the platform admin. Please contact
+                support. You can’t manage salons while suspended.
+              </p>
+            </>
+          ) : (
+            <>
+              <h2 style={{ marginTop: 0 }}>Waiting for admin approval ⏳</h2>
+              <p className="muted">
+                Thanks for signing up as a salon owner! A platform admin has been notified and needs
+                to <strong>approve your account</strong> before you can create salons and add services.
+              </p>
+              <p className="muted" style={{ fontSize: 13 }}>
+                This page updates automatically once you’re approved — no need to refresh.
+              </p>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container">

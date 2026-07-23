@@ -12,7 +12,12 @@ function attachUser(req, _res, next) {
   if (scheme === 'Bearer' && token) {
     try {
       const payload = jwt.verify(token, ACCESS_SECRET);
-      req.user = { id: payload.sub, role: payload.role, email: payload.email };
+      req.user = {
+        id: payload.sub,
+        role: payload.role,
+        email: payload.email,
+        status: payload.status || 'active',
+      };
     } catch {
       /* invalid/expired token — leave req.user undefined */
     }

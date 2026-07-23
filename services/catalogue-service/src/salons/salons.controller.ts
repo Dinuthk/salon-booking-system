@@ -37,6 +37,10 @@ export class SalonsController {
     if (user.role !== 'owner' && user.role !== 'admin') {
       throw new ForbiddenException('Only salon owners can create salons');
     }
+    // Owners must be approved by an admin before they can operate.
+    if (user.role === 'owner' && user.status !== 'active') {
+      throw new ForbiddenException('Your owner account is awaiting admin approval');
+    }
     return this.salons.create(user.id, dto);
   }
 

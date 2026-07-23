@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { adminApi } from '../api/endpoints';
+import { adminApi, usersApi } from '../api/endpoints';
 
 export default function AdminPage() {
   const qc = useQueryClient();
@@ -9,6 +9,13 @@ export default function AdminPage() {
 
   const commission = useQuery({ queryKey: ['commission'], queryFn: adminApi.getCommission });
   const disputes = useQuery({ queryKey: ['disputes'], queryFn: adminApi.disputes });
+  const owners = useQuery({ queryKey: ['owners'], queryFn: usersApi.listOwners, refetchInterval: 5000 });
+
+  const setOwnerStatus = useMutation({
+    mutationFn: (v: { id: string; status: 'active' | 'pending' | 'suspended' }) =>
+      usersApi.setOwnerStatus(v.id, v.status),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['owners'] }),
+  });
 
   const setCommission = useMutation({
     mutationFn: () => adminApi.setCommission(Number(pct)),
@@ -28,6 +35,64 @@ export default function AdminPage() {
       <div className="title-row">
         <h1>Admin console</h1>
         <p className="muted">Platform administration — commission, verification, disputes.</p>
+      </div>
+
+      {/* Owner approval — the primary onboarding gate */}
+      <div className="card" style={{ marginBottom: 20 }}>
+        <div className="row between">
+          <h2 style={{ margin: 0 }}>Owner accounts</h2>
+          <span className="muted" style={{ fontSize: 13 }}>
+            {owners.data?.filter((o) => o.status === 'pending').length || 0} awaiting approval
+          </span>
+        </div>
+        <p className="muted" style={{ fontSize: 13 }}>
+          Approve an owner so they can create salons; suspend to revoke access.
+        </p>
+        {owners.data && owners.data.length === 0 && <p className="muted">No owner accounts yet.</p>}
+        <div style={{ overflowX: 'auto' }}>
+          {owners.data && owners.data.length > 0 && (
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ textAlign: 'left', color: 'var(--muted)', fontSize: 13 }}>
+                  <th style={{ padding: '6px 8px' }}>Owner</th>
+                  <th style={{ padding: '6px 8px' }}>ID</th>
+                  <th style={{ padding: '6px 8px' }}>Status</th>
+                  <th style={{ padding: '6px 8px' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {owners.data.map((o) => (
+                  <tr key={o.id} style={{ borderTop: '1px solid var(--border)' }}>
+                    <td style={{ padding: '8px' }}>
+                      <strong>{o.fullName}</strong>
+                      <div className="muted" style={{ fontSize: 12 }}>{o.email}</div>
+                    </td>
+                    <td style={{ padding: '8px', fontFamily: 'monospace', fontSize: 12 }}>{o.id.slice(0, 8)}…</td>
+                    <td style={{ padding: '8px' }}>
+                      <span className={`badge ${o.status === 'active' ? 'confirmed' : o.status === 'suspended' ? 'cancelled' : 'pending'}`}>
+                        {o.status}
+                      </span>
+                    </td>
+                    <td style={{ padding: '8px' }}>
+                      <div className="row">
+                        {o.status !== 'active' && (
+                          <button className="btn sm" onClick={() => setOwnerStatus.mutate({ id: o.id, status: 'active' })}>
+                            Approve
+                          </button>
+                        )}
+                        {o.status !== 'suspended' && (
+                          <button className="btn ghost sm" onClick={() => setOwnerStatus.mutate({ id: o.id, status: 'suspended' })}>
+                            Suspend
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
 
       <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', marginBottom: 20 }}>

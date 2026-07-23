@@ -97,7 +97,7 @@ services:
   identity-service:
     build: ./services/identity-service
     environment:
-      <<: *postgres-env
+      <<: [*postgres-env, *rabbit-env]
       NODE_ENV: development
       PORT: ${IDENTITY_PORT:-3001}
       POSTGRES_DB: ${IDENTITY_DB:-identity_db}
@@ -111,6 +111,8 @@ services:
       - "${IDENTITY_PORT:-3001}:${IDENTITY_PORT:-3001}"
     depends_on:
       postgres:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     volumes:
       - ./services/identity-service/src:/app/src
