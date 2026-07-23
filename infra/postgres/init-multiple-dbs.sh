@@ -12,7 +12,8 @@ create_db() {
 EOSQL
 }
 
-for db in "$IDENTITY_DB" "$BOOKING_DB" "$PAYMENT_DB"; do
+for db in "$IDENTITY_DB" "$BOOKING_DB" "$PAYMENT_DB" \
+          "$LOYALTY_DB" "$STAFF_DB" "$REPORTING_DB" "$ADMIN_DB"; do
   if [ -n "$db" ]; then
     create_db "$db"
   fi

@@ -33,6 +33,10 @@ services:
       IDENTITY_DB: ${IDENTITY_DB:-identity_db}
       BOOKING_DB: ${BOOKING_DB:-booking_db}
       PAYMENT_DB: ${PAYMENT_DB:-payment_db}
+      LOYALTY_DB: ${LOYALTY_DB:-loyalty_db}
+      STAFF_DB: ${STAFF_DB:-staff_db}
+      REPORTING_DB: ${REPORTING_DB:-reporting_db}
+      ADMIN_DB: ${ADMIN_DB:-admin_db}
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
@@ -73,15 +77,15 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-salon}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-salon_pw}
-      # Deterministic cookie written with correct 0600 perms by the entrypoint —
-      # works around the ".erlang.cookie: eacces" volume-permission issue on
-      # Docker Desktop for Windows.
-      RABBITMQ_ERLANG_COOKIE: ${RABBITMQ_ERLANG_COOKIE:-salon-dev-cookie}
     ports:
       - "${RABBITMQ_HOST_PORT:-5673}:5672"
       - "${RABBITMQ_UI_PORT:-15673}:15672"   # management UI
-    volumes:
-      - rabbitmqdata:/var/lib/rabbitmq
+    # Ephemeral in-memory data dir — avoids the ".erlang.cookie: eacces"
+    # volume-permission problem on Docker Desktop / WSL. RabbitMQ state is
+    # rebuilt on start (services re-assert their exchange/queues), so this is
+    # fine for local dev.
+    tmpfs:
+      - /var/lib/rabbitmq
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 15s
@@ -101,6 +105,8 @@ services:
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-dev_refresh_secret_change_me}
       JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-900}
       JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-1209600}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@salon.local}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin12345}
     ports:
       - "${IDENTITY_PORT:-3001}:${IDENTITY_PORT:-3001}"
     depends_on:
@@ -187,6 +193,107 @@ services:
     volumes:
       - ./services/payment-service/src:/app/src
 
+  notification-service:
+    build: ./services/notification-service
+    environment:
+      <<: *rabbit-env
+      NODE_ENV: development
+      PORT: ${NOTIFICATION_PORT:-3006}
+      MONGO_URI: mongodb://${MONGO_HOST:-mongo}:${MONGO_PORT:-27017}/${NOTIFICATION_DB:-notification_db}
+    ports:
+      - "${NOTIFICATION_PORT:-3006}:${NOTIFICATION_PORT:-3006}"
+    depends_on:
+      mongo:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./services/notification-service/src:/app/src
+
+  review-service:
+    build: ./services/review-service
+    environment:
+      <<: *rabbit-env
+      NODE_ENV: development
+      PORT: ${REVIEW_PORT:-3007}
+      MONGO_URI: mongodb://${MONGO_HOST:-mongo}:${MONGO_PORT:-27017}/${REVIEW_DB:-review_db}
+    ports:
+      - "${REVIEW_PORT:-3007}:${REVIEW_PORT:-3007}"
+    depends_on:
+      mongo:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./services/review-service/src:/app/src
+
+  loyalty-service:
+    build: ./services/loyalty-service
+    environment:
+      <<: [*postgres-env, *rabbit-env]
+      NODE_ENV: development
+      PORT: ${LOYALTY_PORT:-3008}
+      POSTGRES_DB: ${LOYALTY_DB:-loyalty_db}
+    ports:
+      - "${LOYALTY_PORT:-3008}:${LOYALTY_PORT:-3008}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./services/loyalty-service/src:/app/src
+
+  staff-service:
+    build: ./services/staff-service
+    environment:
+      <<: *postgres-env
+      NODE_ENV: development
+      PORT: ${STAFF_PORT:-3009}
+      POSTGRES_DB: ${STAFF_DB:-staff_db}
+    ports:
+      - "${STAFF_PORT:-3009}:${STAFF_PORT:-3009}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./services/staff-service/src:/app/src
+
+  reporting-service:
+    build: ./services/reporting-service
+    environment:
+      <<: [*postgres-env, *rabbit-env]
+      NODE_ENV: development
+      PORT: ${REPORTING_PORT:-3010}
+      POSTGRES_DB: ${REPORTING_DB:-reporting_db}
+    ports:
+      - "${REPORTING_PORT:-3010}:${REPORTING_PORT:-3010}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./services/reporting-service/src:/app/src
+
+  admin-service:
+    build: ./services/admin-service
+    environment:
+      <<: [*postgres-env, *rabbit-env]
+      NODE_ENV: development
+      PORT: ${ADMIN_PORT:-3011}
+      POSTGRES_DB: ${ADMIN_DB:-admin_db}
+      PLATFORM_COMMISSION_PCT: ${PLATFORM_COMMISSION_PCT:-10}
+    ports:
+      - "${ADMIN_PORT:-3011}:${ADMIN_PORT:-3011}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./services/admin-service/src:/app/src
+
   gateway:
     build: ./gateway
     environment:
@@ -198,6 +305,12 @@ services:
       SEARCH_URL: http://search-service:${SEARCH_PORT:-3003}
       BOOKING_URL: http://booking-service:${BOOKING_PORT:-3004}
       PAYMENT_URL: http://payment-service:${PAYMENT_PORT:-3005}
+      NOTIFICATION_URL: http://notification-service:${NOTIFICATION_PORT:-3006}
+      REVIEW_URL: http://review-service:${REVIEW_PORT:-3007}
+      LOYALTY_URL: http://loyalty-service:${LOYALTY_PORT:-3008}
+      STAFF_URL: http://staff-service:${STAFF_PORT:-3009}
+      REPORTING_URL: http://reporting-service:${REPORTING_PORT:-3010}
+      ADMIN_URL: http://admin-service:${ADMIN_PORT:-3011}
     ports:
       - "${GATEWAY_HOST_PORT:-8090}:${GATEWAY_PORT:-8080}"
     depends_on:
@@ -206,6 +319,12 @@ services:
       - search-service
       - booking-service
       - payment-service
+      - notification-service
+      - review-service
+      - loyalty-service
+      - staff-service
+      - reporting-service
+      - admin-service
     volumes:
       - ./gateway/src:/app/src
 
@@ -224,4 +343,3 @@ services:
 volumes:
   pgdata:
   mongodata:
-  rabbitmqdata:

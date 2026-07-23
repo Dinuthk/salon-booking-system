@@ -2,6 +2,8 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
+  OnModuleInit,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -13,11 +15,27 @@ import { LoginDto } from './dto/login.dto';
 import { User } from '../users/user.entity';
 
 @Injectable()
-export class AuthService {
+export class AuthService implements OnModuleInit {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly users: UsersService,
     private readonly jwt: JwtService,
   ) {}
+
+  // Seed a platform admin (self-registration can't create admins).
+  async onModuleInit() {
+    const email = (process.env.ADMIN_EMAIL || 'admin@salon.local').toLowerCase();
+    const password = process.env.ADMIN_PASSWORD || 'admin12345';
+    if (await this.users.findByEmail(email)) return;
+    await this.users.create({
+      email,
+      passwordHash: await bcrypt.hash(password, 10),
+      fullName: 'Platform Admin',
+      role: UserRole.ADMIN,
+    });
+    this.logger.log(`Seeded admin account: ${email}`);
+  }
 
   async register(dto: RegisterDto) {
     const role = dto.role ?? UserRole.CUSTOMER;

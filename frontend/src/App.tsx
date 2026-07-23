@@ -7,6 +7,10 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import BookingsPage from './pages/BookingsPage';
 import OwnerPage from './pages/OwnerPage';
+import RewardsPage from './pages/RewardsPage';
+import NotificationsPage from './pages/NotificationsPage';
+import DashboardPage from './pages/DashboardPage';
+import AdminPage from './pages/AdminPage';
 
 export default function App() {
   return (
@@ -30,6 +34,38 @@ export default function App() {
           element={
             <ProtectedRoute>
               <OwnerPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <DashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/rewards"
+          element={
+            <ProtectedRoute>
+              <RewardsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/notifications"
+          element={
+            <ProtectedRoute>
+              <NotificationsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute>
+              <AdminPage />
             </ProtectedRoute>
           }
         />

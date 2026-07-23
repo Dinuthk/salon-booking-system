@@ -13,6 +13,12 @@ const TARGETS = {
   search: process.env.SEARCH_URL,
   booking: process.env.BOOKING_URL,
   payment: process.env.PAYMENT_URL,
+  notification: process.env.NOTIFICATION_URL,
+  review: process.env.REVIEW_URL,
+  loyalty: process.env.LOYALTY_URL,
+  staff: process.env.STAFF_URL,
+  reporting: process.env.REPORTING_URL,
+  admin: process.env.ADMIN_URL,
 };
 
 app.use(cors());
@@ -91,6 +97,28 @@ app.use('/api/salons', (req, res, next) => {
 
 // Payments: always require auth.
 app.use('/api/payments', requireUser, proxy('payments', TARGETS.payment));
+
+// Notifications & loyalty: always require auth.
+app.use('/api/notifications', requireUser, proxy('notifications', TARGETS.notification));
+app.use('/api/loyalty', requireUser, proxy('loyalty', TARGETS.loyalty));
+
+// Reviews: public reads for a salon; everything else requires auth.
+app.use('/api/reviews', (req, res, next) => {
+  const isPublicRead = req.method === 'GET' && req.path.startsWith('/salon');
+  if (isPublicRead) return next();
+  return requireUser(req, res, next);
+}, proxy('reviews', TARGETS.review));
+
+// Staff: public reads for a salon; management requires auth.
+app.use('/api/staff', (req, res, next) => {
+  const isPublicRead = req.method === 'GET' && req.path.startsWith('/salon');
+  if (isPublicRead) return next();
+  return requireUser(req, res, next);
+}, proxy('staff', TARGETS.staff));
+
+// Reporting & Admin: always require auth (role enforced downstream).
+app.use('/api/reports', requireUser, proxy('reports', TARGETS.reporting));
+app.use('/api/admin', requireUser, proxy('admin', TARGETS.admin));
 
 app.use((_req, res) => res.status(404).json({ statusCode: 404, message: 'Not found' }));
 

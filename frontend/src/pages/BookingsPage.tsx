@@ -1,15 +1,36 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { bookingApi, paymentApi, Booking } from '../api/endpoints';
+import { useSelector } from 'react-redux';
+import { RootState } from '../store';
+import { bookingApi, paymentApi, reviewApi, Booking } from '../api/endpoints';
 
 export default function BookingsPage() {
   const qc = useQueryClient();
   const [busyId, setBusyId] = useState('');
+  const [ratings, setRatings] = useState<Record<string, number>>({});
+  const [comments, setComments] = useState<Record<string, string>>({});
+  const user = useSelector((s: RootState) => s.auth.user);
 
   const { data: bookings, isLoading } = useQuery({
     queryKey: ['bookings', 'mine'],
     queryFn: bookingApi.mine,
     refetchInterval: 4000, // reflect saga confirmation as it lands
+  });
+
+  const { data: reviewable } = useQuery({
+    queryKey: ['reviews', 'pending'],
+    queryFn: reviewApi.pending,
+  });
+
+  const submitReview = useMutation({
+    mutationFn: (bookingId: string) =>
+      reviewApi.create({
+        bookingId,
+        rating: ratings[bookingId] || 5,
+        comment: comments[bookingId],
+        customerName: user?.fullName,
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['reviews', 'pending'] }),
   });
 
   const pay = useMutation({
@@ -39,6 +60,37 @@ export default function BookingsPage() {
         <h1>My bookings</h1>
         <p className="muted">Pay to confirm a reservation, or cancel if plans change.</p>
       </div>
+
+      {reviewable && reviewable.length > 0 && (
+        <div className="card" style={{ marginBottom: 20, borderColor: 'var(--brand)' }}>
+          <h2 style={{ marginTop: 0 }}>Rate your recent visits</h2>
+          {reviewable.map((rv) => (
+            <div key={rv.bookingId} className="card" style={{ marginTop: 10 }}>
+              <strong>{rv.serviceName || 'Appointment'}</strong>
+              <div className="row" style={{ margin: '8px 0' }}>
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <span
+                    key={n}
+                    onClick={() => setRatings({ ...ratings, [rv.bookingId]: n })}
+                    style={{ cursor: 'pointer', fontSize: 24, color: n <= (ratings[rv.bookingId] || 5) ? '#d97706' : 'var(--border)' }}
+                  >
+                    ★
+                  </span>
+                ))}
+              </div>
+              <input
+                placeholder="Add a comment (optional)"
+                value={comments[rv.bookingId] || ''}
+                onChange={(e) => setComments({ ...comments, [rv.bookingId]: e.target.value })}
+                style={{ width: '100%', marginBottom: 8 }}
+              />
+              <button className="btn sm" onClick={() => submitReview.mutate(rv.bookingId)}>
+                Submit review
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {isLoading && <p className="muted">Loading…</p>}
       {bookings && bookings.length === 0 && (

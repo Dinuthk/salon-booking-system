@@ -147,6 +147,9 @@ export class BookingsService implements OnModuleInit {
       bookingId: booking.id,
       customerId: booking.customerId,
       salonId: booking.salonId,
+      ownerId: booking.ownerId,
+      serviceName: booking.serviceName,
+      amount: Number(booking.price),
       startTime: booking.startTime,
     });
     this.logger.log(`Booking ${bookingId} confirmed`);
@@ -176,10 +179,64 @@ export class BookingsService implements OnModuleInit {
       this.bus.publish('booking.cancelled', {
         bookingId: booking.id,
         customerId: booking.customerId,
+        salonId: booking.salonId,
+        ownerId: booking.ownerId,
+        amount: Number(booking.price),
         refund: true,
       });
     }
     return booking;
+  }
+
+  // ---------------- Appointment lifecycle (owner/staff) ----------------
+  async complete(userId: string, role: string, bookingId: string): Promise<Booking> {
+    const booking = await this.findOne(bookingId);
+    if (booking.ownerId !== userId && role !== 'admin') {
+      throw new ForbiddenException('Only the salon owner can complete this booking');
+    }
+    if (booking.status !== BookingStatus.CONFIRMED) {
+      throw new BadRequestException(`Cannot complete a ${booking.status} booking`);
+    }
+    booking.status = BookingStatus.COMPLETED;
+    await this.repo.save(booking);
+    // Drives loyalty accrual, review eligibility, analytics.
+    this.bus.publish('booking.completed', {
+      bookingId: booking.id,
+      customerId: booking.customerId,
+      salonId: booking.salonId,
+      ownerId: booking.ownerId,
+      serviceId: booking.serviceId,
+      serviceName: booking.serviceName,
+      amount: Number(booking.price),
+      currency: booking.currency,
+    });
+    this.logger.log(`Booking ${booking.id} completed`);
+    return booking;
+  }
+
+  async markNoShow(userId: string, role: string, bookingId: string): Promise<Booking> {
+    const booking = await this.findOne(bookingId);
+    if (booking.ownerId !== userId && role !== 'admin') {
+      throw new ForbiddenException('Only the salon owner can mark a no-show');
+    }
+    if (booking.status !== BookingStatus.CONFIRMED) {
+      throw new BadRequestException(`Cannot mark a ${booking.status} booking as no-show`);
+    }
+    booking.status = BookingStatus.NO_SHOW;
+    await this.repo.save(booking);
+    this.bus.publish('booking.no_show', {
+      bookingId: booking.id,
+      customerId: booking.customerId,
+      salonId: booking.salonId,
+      ownerId: booking.ownerId,
+      amount: Number(booking.price),
+    });
+    return booking;
+  }
+
+  /** Owner view: all bookings across the owner's salons. */
+  findForOwner(ownerId: string): Promise<Booking[]> {
+    return this.repo.find({ where: { ownerId }, order: { startTime: 'DESC' } });
   }
 
   private async releaseBooking(booking: Booking, reason: string): Promise<void> {
@@ -191,6 +248,7 @@ export class BookingsService implements OnModuleInit {
     }
     this.bus.publish('slot.freed', {
       bookingId: booking.id,
+      customerId: booking.customerId,
       salonId: booking.salonId,
       resourceKey: booking.resourceKey,
       startTime: booking.startTime,

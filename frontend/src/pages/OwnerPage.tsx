@@ -1,11 +1,33 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { salonApi } from '../api/endpoints';
+import { salonApi, staffApi, bookingApi } from '../api/endpoints';
 
 export default function OwnerPage() {
   const qc = useQueryClient();
   const { data: salons } = useQuery({ queryKey: ['salons', 'mine'], queryFn: salonApi.mine });
+  const { data: myStaff } = useQuery({ queryKey: ['staff', 'mine'], queryFn: staffApi.mine });
+  const { data: ownerBookings } = useQuery({
+    queryKey: ['bookings', 'owner'],
+    queryFn: bookingApi.ownerList,
+    refetchInterval: 5000,
+  });
+
+  const [staffForm, setStaffForm] = useState<Record<string, { name: string; title: string }>>({});
+
+  const addStaff = useMutation({
+    mutationFn: (v: { salonId: string; name: string; title: string }) =>
+      staffApi.create({ salonId: v.salonId, name: v.name, title: v.title }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['staff', 'mine'] }),
+  });
+  const complete = useMutation({
+    mutationFn: (id: string) => bookingApi.complete(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['bookings', 'owner'] }),
+  });
+  const noShow = useMutation({
+    mutationFn: (id: string) => bookingApi.noShow(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['bookings', 'owner'] }),
+  });
 
   const [salon, setSalon] = useState({ name: '', city: '', address: '', description: '' });
   const [svc, setSvc] = useState<Record<string, { name: string; price: string; durationMinutes: string }>>({});
@@ -123,9 +145,69 @@ export default function OwnerPage() {
                   ))}
                 </div>
               )}
+
+              {/* Staff */}
+              <div style={{ marginTop: 14, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+                <label>Staff</label>
+                <div className="row" style={{ marginTop: 6, alignItems: 'flex-end' }}>
+                  <input
+                    placeholder="Name"
+                    style={{ flex: 2 }}
+                    value={staffForm[s._id]?.name || ''}
+                    onChange={(e) => setStaffForm({ ...staffForm, [s._id]: { ...(staffForm[s._id] || { title: '' }), name: e.target.value } })}
+                  />
+                  <input
+                    placeholder="Title"
+                    style={{ flex: 1 }}
+                    value={staffForm[s._id]?.title || ''}
+                    onChange={(e) => setStaffForm({ ...staffForm, [s._id]: { ...(staffForm[s._id] || { name: '' }), title: e.target.value } })}
+                  />
+                  <button
+                    className="btn sm"
+                    disabled={!staffForm[s._id]?.name}
+                    onClick={() => addStaff.mutate({ salonId: s._id, name: staffForm[s._id].name, title: staffForm[s._id].title || 'Stylist' })}
+                  >
+                    Add staff
+                  </button>
+                </div>
+                <div className="row" style={{ marginTop: 8 }}>
+                  {myStaff?.filter((st) => st.salonId === s._id).map((st) => (
+                    <span key={st.id} className="tag">{st.name} · {st.title}</span>
+                  ))}
+                </div>
+              </div>
             </div>
           );
         })}
+      </div>
+
+      {/* Appointments management */}
+      <h2 style={{ marginTop: 32 }}>Appointments</h2>
+      {ownerBookings && ownerBookings.length === 0 && <p className="muted">No appointments yet.</p>}
+      <div className="grid">
+        {ownerBookings?.map((b) => (
+          <div key={b.id} className="card row between">
+            <div>
+              <strong>{b.serviceName}</strong>
+              <p className="muted" style={{ margin: '4px 0' }}>
+                {new Date(b.startTime).toLocaleString()} · LKR {b.price}
+              </p>
+            </div>
+            <div className="row">
+              <span className={`badge ${b.status}`}>{b.status}</span>
+              {b.status === 'confirmed' && (
+                <>
+                  <button className="btn sm" onClick={() => complete.mutate(b.id)}>Mark completed</button>
+                  <button className="btn ghost sm" onClick={() => noShow.mutate(b.id)}>No-show</button>
+                </>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ marginTop: 24 }}>
+        <Link className="btn ghost" to="/dashboard">View business dashboard →</Link>
       </div>
     </div>
   );

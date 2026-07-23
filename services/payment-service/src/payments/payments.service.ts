@@ -20,7 +20,7 @@ import { EventBusService } from '../events/event-bus.service';
 @Injectable()
 export class PaymentsService implements OnModuleInit {
   private readonly logger = new Logger(PaymentsService.name);
-  private readonly commissionPct = parseFloat(process.env.PLATFORM_COMMISSION_PCT || '10');
+  private commissionPct = parseFloat(process.env.PLATFORM_COMMISSION_PCT || '10');
 
   constructor(
     @InjectRepository(Payment) private readonly repo: Repository<Payment>,
@@ -44,6 +44,13 @@ export class PaymentsService implements OnModuleInit {
         }
       },
     );
+    // Live commission rate from the Admin service.
+    await this.bus.subscribe('payment.commission', ['commission.updated'], async (_rk, p) => {
+      if (typeof p.pct === 'number') {
+        this.commissionPct = p.pct;
+        this.logger.log(`Commission rate updated to ${p.pct}%`);
+      }
+    });
   }
 
   private async onBookingPending(p: any): Promise<void> {

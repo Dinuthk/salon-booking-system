@@ -1,7 +1,9 @@
 import {
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
+  OnModuleInit,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -11,11 +13,34 @@ import { CreateServiceDto } from './dto/create-service.dto';
 import { EventBusService } from '../events/event-bus.service';
 
 @Injectable()
-export class SalonsService {
+export class SalonsService implements OnModuleInit {
+  private readonly logger = new Logger(SalonsService.name);
+
   constructor(
     @InjectModel(Salon.name) private readonly model: Model<SalonDocument>,
     private readonly bus: EventBusService,
   ) {}
+
+  async onModuleInit() {
+    // Rating updates (Review service) and verification/suspension (Admin service);
+    // either way we persist and re-index for Search.
+    await this.bus.subscribe(
+      'catalogue.sync',
+      ['salon.rating.updated', 'admin.salon.status'],
+      async (rk, p) => {
+        const salon = await this.model.findById(p.salonId);
+        if (!salon) return;
+        if (rk === 'salon.rating.updated') {
+          salon.ratingAvg = p.ratingAvg;
+          salon.ratingCount = p.ratingCount;
+        } else if (rk === 'admin.salon.status') {
+          salon.status = p.status;
+        }
+        await salon.save();
+        this.emitUpserted(salon);
+      },
+    );
+  }
 
   async create(ownerId: string, dto: CreateSalonDto): Promise<SalonDocument> {
     const salon = await this.model.create({

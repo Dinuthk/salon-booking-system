@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
-import { salonApi, bookingApi, SalonServiceItem } from '../api/endpoints';
+import { salonApi, bookingApi, reviewApi, SalonServiceItem } from '../api/endpoints';
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10);
@@ -23,6 +23,8 @@ export default function SalonDetailPage() {
     queryKey: ['salon', id],
     queryFn: () => salonApi.get(id),
   });
+
+  const reviews = useQuery({ queryKey: ['reviews', id], queryFn: () => reviewApi.forSalon(id) });
 
   const availability = useQuery({
     queryKey: ['availability', id, selectedService?._id, date],
@@ -150,6 +152,29 @@ export default function SalonDetailPage() {
             </>
           )}
         </div>
+      </div>
+
+      <div className="card" style={{ marginTop: 20 }}>
+        <h2>Reviews {reviews.data && reviews.data.length > 0 && <span className="muted">({reviews.data.length})</span>}</h2>
+        {(!reviews.data || reviews.data.length === 0) && (
+          <p className="muted">No reviews yet — be the first after your visit!</p>
+        )}
+        {reviews.data?.map((r) => (
+          <div key={r._id} className="card" style={{ marginTop: 10 }}>
+            <div className="row between">
+              <strong>{r.customerName || 'Customer'}</strong>
+              <span className="tag">{'★'.repeat(r.rating)}{'☆'.repeat(5 - r.rating)}</span>
+            </div>
+            {r.comment && <p style={{ margin: '6px 0 0' }}>{r.comment}</p>}
+            {r.serviceName && <p className="muted" style={{ margin: '4px 0 0', fontSize: 12 }}>{r.serviceName}</p>}
+            {r.ownerReply && (
+              <div style={{ marginTop: 8, paddingLeft: 12, borderLeft: '3px solid var(--brand)' }}>
+                <span className="tag">Owner reply</span>
+                <p style={{ margin: '4px 0 0' }}>{r.ownerReply}</p>
+              </div>
+            )}
+          </div>
+        ))}
       </div>
     </div>
   );

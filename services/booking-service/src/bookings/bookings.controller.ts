@@ -5,6 +5,7 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
   Query,
 } from '@nestjs/common';
@@ -33,6 +34,22 @@ export class BookingsController {
   @Get('mine')
   mine(@CurrentUser() user: GatewayUser) {
     return this.bookings.findMine(user.id);
+  }
+
+  // Owner: all bookings across their salons
+  @Get('owner/list')
+  ownerList(@CurrentUser() user: GatewayUser) {
+    return this.bookings.findForOwner(user.id);
+  }
+
+  @Patch(':id/complete')
+  complete(@CurrentUser() user: GatewayUser, @Param('id') id: string) {
+    return this.bookings.complete(user.id, user.role, id);
+  }
+
+  @Patch(':id/no-show')
+  noShow(@CurrentUser() user: GatewayUser, @Param('id') id: string) {
+    return this.bookings.markNoShow(user.id, user.role, id);
   }
 
   @Get(':id')

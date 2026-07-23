@@ -17,9 +17,12 @@ export default function Navbar() {
         <div className="nav-spacer" />
         <Link to="/">Discover</Link>
         {user && <Link to="/bookings">My Bookings</Link>}
+        {user && <Link to="/rewards">Rewards</Link>}
+        {user && <Link to="/notifications">Alerts</Link>}
         {user && (user.role === 'owner' || user.role === 'admin') && (
           <Link to="/owner">Owner</Link>
         )}
+        {user && user.role === 'admin' && <Link to="/admin">Admin</Link>}
         {user ? (
           <>
             <span className="muted">Hi, {user.fullName.split(' ')[0]}</span>
