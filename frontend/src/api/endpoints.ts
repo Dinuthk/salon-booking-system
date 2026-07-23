@@ -85,17 +85,29 @@ export const authApi = {
     api.post('/auth/refresh', { refreshToken }).then((r) => r.data),
 };
 
-export interface OwnerAccount {
+export interface Account {
   id: string;
   email: string;
   fullName: string;
+  phone: string | null;
+  role: string;
   status: 'active' | 'pending' | 'suspended';
+  lastLoginAt: string | null;
   createdAt: string;
 }
+export type OwnerAccount = Account;
 
-// Admin: manage owner-account approval.
+export interface PlatformStats {
+  customers: number;
+  owners: number;
+  pendingOwners: number;
+}
+
+// Admin: manage accounts.
 export const usersApi = {
-  listOwners: () => api.get('/users/owners').then((r) => r.data as OwnerAccount[]),
+  listOwners: () => api.get('/users/owners').then((r) => r.data as Account[]),
+  listCustomers: () => api.get('/users/customers').then((r) => r.data as Account[]),
+  stats: () => api.get('/users/stats').then((r) => r.data as PlatformStats),
   setOwnerStatus: (id: string, status: 'active' | 'pending' | 'suspended') =>
     api.patch(`/users/${id}/status`, { status }).then((r) => r.data),
 };

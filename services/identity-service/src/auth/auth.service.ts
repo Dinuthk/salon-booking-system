@@ -59,6 +59,9 @@ export class AuthService implements OnModuleInit {
       role,
       status,
     });
+    // Registration logs the user in, so it counts as first activity.
+    user.lastLoginAt = new Date();
+    await this.users.save(user);
 
     if (role === UserRole.OWNER) {
       const admins = await this.users.findAdmins();
@@ -81,6 +84,8 @@ export class AuthService implements OnModuleInit {
     if (!ok) {
       throw new UnauthorizedException('Invalid credentials');
     }
+    user.lastLoginAt = new Date();
+    await this.users.save(user);
     return this.buildAuthResponse(user);
   }
 

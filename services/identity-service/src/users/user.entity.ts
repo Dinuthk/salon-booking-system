@@ -40,6 +40,10 @@ export class User {
   @Column({ default: false })
   twoFactorEnabled: boolean;
 
+  // Updated on each successful login — gives admins a sense of active users.
+  @Column({ type: 'timestamptz', nullable: true })
+  lastLoginAt?: Date | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

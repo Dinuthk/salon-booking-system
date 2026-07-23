@@ -36,12 +36,29 @@ export class UsersService {
     return this.repo.save(user);
   }
 
+  save(user: User): Promise<User> {
+    return this.repo.save(user);
+  }
+
   findOwners(): Promise<User[]> {
     return this.repo.find({ where: { role: UserRole.OWNER }, order: { createdAt: 'DESC' } });
   }
 
+  findCustomers(): Promise<User[]> {
+    return this.repo.find({ where: { role: UserRole.CUSTOMER }, order: { createdAt: 'DESC' } });
+  }
+
   findAdmins(): Promise<User[]> {
     return this.repo.find({ where: { role: UserRole.ADMIN } });
+  }
+
+  async counts(): Promise<{ customers: number; owners: number; pendingOwners: number }> {
+    const [customers, owners, pendingOwners] = await Promise.all([
+      this.repo.count({ where: { role: UserRole.CUSTOMER } }),
+      this.repo.count({ where: { role: UserRole.OWNER } }),
+      this.repo.count({ where: { role: UserRole.OWNER, status: AccountStatus.PENDING } }),
+    ]);
+    return { customers, owners, pendingOwners };
   }
 
   async setStatus(id: string, status: AccountStatus): Promise<User> {

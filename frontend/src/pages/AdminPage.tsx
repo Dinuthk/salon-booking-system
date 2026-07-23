@@ -10,6 +10,11 @@ export default function AdminPage() {
   const commission = useQuery({ queryKey: ['commission'], queryFn: adminApi.getCommission });
   const disputes = useQuery({ queryKey: ['disputes'], queryFn: adminApi.disputes });
   const owners = useQuery({ queryKey: ['owners'], queryFn: usersApi.listOwners, refetchInterval: 5000 });
+  const customers = useQuery({ queryKey: ['customers'], queryFn: usersApi.listCustomers, refetchInterval: 8000 });
+  const stats = useQuery({ queryKey: ['userStats'], queryFn: usersApi.stats, refetchInterval: 8000 });
+
+  const fmt = (d: string | null) =>
+    d ? new Date(d).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
 
   const setOwnerStatus = useMutation({
     mutationFn: (v: { id: string; status: 'active' | 'pending' | 'suspended' }) =>
@@ -34,7 +39,23 @@ export default function AdminPage() {
     <div className="container">
       <div className="title-row">
         <h1>Admin console</h1>
-        <p className="muted">Platform administration — commission, verification, disputes.</p>
+        <p className="muted">Platform administration — accounts, commission, verification, disputes.</p>
+      </div>
+
+      {/* Platform headline numbers */}
+      <div className="grid cols-3" style={{ marginBottom: 20 }}>
+        <div className="card">
+          <div className="muted" style={{ fontSize: 13 }}>Customers</div>
+          <div style={{ fontSize: 30, fontWeight: 800 }}>{stats.data?.customers ?? '—'}</div>
+        </div>
+        <div className="card">
+          <div className="muted" style={{ fontSize: 13 }}>Salon owners</div>
+          <div style={{ fontSize: 30, fontWeight: 800 }}>{stats.data?.owners ?? '—'}</div>
+        </div>
+        <div className="card" style={{ borderColor: (stats.data?.pendingOwners || 0) > 0 ? 'var(--warn)' : undefined }}>
+          <div className="muted" style={{ fontSize: 13 }}>Owners awaiting approval</div>
+          <div style={{ fontSize: 30, fontWeight: 800 }}>{stats.data?.pendingOwners ?? '—'}</div>
+        </div>
       </div>
 
       {/* Owner approval — the primary onboarding gate */}
@@ -55,8 +76,9 @@ export default function AdminPage() {
               <thead>
                 <tr style={{ textAlign: 'left', color: 'var(--muted)', fontSize: 13 }}>
                   <th style={{ padding: '6px 8px' }}>Owner</th>
-                  <th style={{ padding: '6px 8px' }}>ID</th>
+                  <th style={{ padding: '6px 8px' }}>Phone</th>
                   <th style={{ padding: '6px 8px' }}>Status</th>
+                  <th style={{ padding: '6px 8px' }}>Last active</th>
                   <th style={{ padding: '6px 8px' }}>Actions</th>
                 </tr>
               </thead>
@@ -67,12 +89,13 @@ export default function AdminPage() {
                       <strong>{o.fullName}</strong>
                       <div className="muted" style={{ fontSize: 12 }}>{o.email}</div>
                     </td>
-                    <td style={{ padding: '8px', fontFamily: 'monospace', fontSize: 12 }}>{o.id.slice(0, 8)}…</td>
+                    <td style={{ padding: '8px' }}>{o.phone || <span className="muted">—</span>}</td>
                     <td style={{ padding: '8px' }}>
                       <span className={`badge ${o.status === 'active' ? 'confirmed' : o.status === 'suspended' ? 'cancelled' : 'pending'}`}>
                         {o.status}
                       </span>
                     </td>
+                    <td style={{ padding: '8px', fontSize: 12 }} className="muted">{fmt(o.lastLoginAt)}</td>
                     <td style={{ padding: '8px' }}>
                       <div className="row">
                         {o.status !== 'active' && (
@@ -87,6 +110,42 @@ export default function AdminPage() {
                         )}
                       </div>
                     </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+
+      {/* Customer accounts */}
+      <div className="card" style={{ marginBottom: 20 }}>
+        <div className="row between">
+          <h2 style={{ margin: 0 }}>Customer accounts</h2>
+          <span className="muted" style={{ fontSize: 13 }}>{customers.data?.length || 0} registered</span>
+        </div>
+        {customers.data && customers.data.length === 0 && <p className="muted">No customers yet.</p>}
+        <div style={{ overflowX: 'auto' }}>
+          {customers.data && customers.data.length > 0 && (
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ textAlign: 'left', color: 'var(--muted)', fontSize: 13 }}>
+                  <th style={{ padding: '6px 8px' }}>Customer</th>
+                  <th style={{ padding: '6px 8px' }}>Phone</th>
+                  <th style={{ padding: '6px 8px' }}>Joined</th>
+                  <th style={{ padding: '6px 8px' }}>Last active</th>
+                </tr>
+              </thead>
+              <tbody>
+                {customers.data.map((c) => (
+                  <tr key={c.id} style={{ borderTop: '1px solid var(--border)' }}>
+                    <td style={{ padding: '8px' }}>
+                      <strong>{c.fullName}</strong>
+                      <div className="muted" style={{ fontSize: 12 }}>{c.email}</div>
+                    </td>
+                    <td style={{ padding: '8px' }}>{c.phone || <span className="muted">—</span>}</td>
+                    <td style={{ padding: '8px', fontSize: 12 }} className="muted">{fmt(c.createdAt)}</td>
+                    <td style={{ padding: '8px', fontSize: 12 }} className="muted">{fmt(c.lastLoginAt)}</td>
                   </tr>
                 ))}
               </tbody>
