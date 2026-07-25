@@ -106,7 +106,13 @@ export class AuthService implements OnModuleInit {
   }
 
   private async buildAuthResponse(user: User) {
-    const claims = { sub: user.id, email: user.email, role: user.role, status: user.status };
+    const claims = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+      status: user.status,
+      name: user.fullName,
+    };
     const [accessToken, refreshToken] = await Promise.all([
       this.jwt.signAsync(claims, {
         secret: process.env.JWT_ACCESS_SECRET,

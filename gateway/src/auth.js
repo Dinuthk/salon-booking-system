@@ -17,6 +17,7 @@ function attachUser(req, _res, next) {
         role: payload.role,
         email: payload.email,
         status: payload.status || 'active',
+        name: payload.name || '',
       };
     } catch {
       /* invalid/expired token — leave req.user undefined */

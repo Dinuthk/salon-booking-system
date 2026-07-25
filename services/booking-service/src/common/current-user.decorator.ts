@@ -3,6 +3,7 @@ import { createParamDecorator, ExecutionContext, UnauthorizedException } from '@
 export interface GatewayUser {
   id: string;
   role: string;
+  name?: string;
   email?: string;
 }
 
@@ -16,10 +17,12 @@ export const CurrentUser = createParamDecorator(
     const req = ctx.switchToHttp().getRequest();
     const id = req.headers['x-user-id'];
     if (!id) throw new UnauthorizedException('Missing authenticated user');
+    const rawName = req.headers['x-user-name'];
     return {
       id,
       role: req.headers['x-user-role'] || 'customer',
       email: req.headers['x-user-email'],
+      name: rawName ? decodeURIComponent(rawName) : undefined,
     };
   },
 );

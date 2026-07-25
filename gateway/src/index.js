@@ -55,6 +55,8 @@ function proxy(prefix, target) {
         proxyReq.setHeader('x-user-role', req.user.role || 'customer');
         proxyReq.setHeader('x-user-status', req.user.status || 'active');
         if (req.user.email) proxyReq.setHeader('x-user-email', req.user.email);
+        // Encode so non-ASCII names are safe in an HTTP header.
+        if (req.user.name) proxyReq.setHeader('x-user-name', encodeURIComponent(req.user.name));
       }
       // Strip any client-supplied identity headers (spoofing guard).
       else {
@@ -62,6 +64,7 @@ function proxy(prefix, target) {
         proxyReq.removeHeader('x-user-role');
         proxyReq.removeHeader('x-user-status');
         proxyReq.removeHeader('x-user-email');
+        proxyReq.removeHeader('x-user-name');
       }
     },
     onError: (err, _req, res) => {
@@ -76,6 +79,7 @@ app.use((req, _res, next) => {
   delete req.headers['x-user-role'];
   delete req.headers['x-user-status'];
   delete req.headers['x-user-email'];
+  delete req.headers['x-user-name'];
   next();
 });
 

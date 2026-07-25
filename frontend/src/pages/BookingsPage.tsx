@@ -142,6 +142,16 @@ export default function BookingsPage() {
                 </button>
               )}
             </div>
+            {b.status === 'confirmed' && (
+              <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>
+                Waiting for the salon to accept your booking. You can still cancel until they do.
+              </p>
+            )}
+            {b.status === 'approved' && (
+              <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>
+                ✓ The salon accepted this booking — it can no longer be cancelled online. Contact the salon for changes.
+              </p>
+            )}
           </div>
         ))}
       </div>

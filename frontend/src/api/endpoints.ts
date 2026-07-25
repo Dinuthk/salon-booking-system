@@ -48,6 +48,7 @@ export interface Slot {
 export interface Booking {
   id: string;
   salonId: string;
+  customerName?: string;
   serviceId: string;
   serviceName: string;
   staffId?: string;
@@ -146,6 +147,8 @@ export const bookingApi = {
   mine: () => api.get('/bookings/mine').then((r) => r.data as Booking[]),
   ownerList: () => api.get('/bookings/owner/list').then((r) => r.data as Booking[]),
   cancel: (id: string) => api.delete(`/bookings/${id}`).then((r) => r.data),
+  approve: (id: string) => api.patch(`/bookings/${id}/approve`).then((r) => r.data as Booking),
+  ownerCancel: (id: string) => api.patch(`/bookings/${id}/owner-cancel`).then((r) => r.data as Booking),
   complete: (id: string) => api.patch(`/bookings/${id}/complete`).then((r) => r.data as Booking),
   noShow: (id: string) => api.patch(`/bookings/${id}/no-show`).then((r) => r.data as Booking),
 };

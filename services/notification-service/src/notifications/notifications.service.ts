@@ -19,7 +19,7 @@ export class NotificationsService implements OnModuleInit {
   async onModuleInit() {
     await this.bus.subscribe(
       'notification.events',
-      ['booking.confirmed', 'booking.completed', 'booking.cancelled', 'slot.freed', 'owner.registered'],
+      ['booking.confirmed', 'booking.approved', 'booking.completed', 'booking.cancelled', 'slot.freed', 'owner.registered'],
       async (rk, p) => this.handle(rk, p),
     );
   }
@@ -46,7 +46,9 @@ export class NotificationsService implements OnModuleInit {
   private render(rk: string, p: any): { userId: string; title: string; body: string } | null {
     switch (rk) {
       case 'booking.confirmed':
-        return { userId: p.customerId, title: 'Booking confirmed ✅', body: 'Your appointment is confirmed. See you soon!' };
+        return { userId: p.customerId, title: 'Booking confirmed ✅', body: 'Your appointment is confirmed. Waiting for the salon to accept it.' };
+      case 'booking.approved':
+        return { userId: p.customerId, title: 'Salon accepted your booking 🎉', body: `The salon approved your ${p.serviceName || 'appointment'}. It can no longer be cancelled online.` };
       case 'booking.completed':
         return { userId: p.customerId, title: 'Thanks for visiting 💜', body: `Hope you enjoyed your ${p.serviceName || 'appointment'}. Leave a review!` };
       case 'booking.cancelled':

@@ -42,6 +42,11 @@ export class BookingsController {
     return this.bookings.findForOwner(user.id);
   }
 
+  @Patch(':id/approve')
+  approve(@CurrentUser() user: GatewayUser, @Param('id') id: string) {
+    return this.bookings.approve(user.id, user.role, id);
+  }
+
   @Patch(':id/complete')
   complete(@CurrentUser() user: GatewayUser, @Param('id') id: string) {
     return this.bookings.complete(user.id, user.role, id);
@@ -52,6 +57,12 @@ export class BookingsController {
     return this.bookings.markNoShow(user.id, user.role, id);
   }
 
+  // Owner cancels a confirmed/approved booking (refunds the customer if paid).
+  @Patch(':id/owner-cancel')
+  ownerCancel(@CurrentUser() user: GatewayUser, @Param('id') id: string) {
+    return this.bookings.ownerCancel(user.id, user.role, id);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.bookings.findOne(id);
@@ -59,7 +70,7 @@ export class BookingsController {
 
   @Post()
   create(@CurrentUser() user: GatewayUser, @Body() dto: CreateBookingDto) {
-    return this.bookings.create(user.id, dto);
+    return this.bookings.create(user.id, user.name, dto);
   }
 
   @Delete(':id')

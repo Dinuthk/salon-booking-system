@@ -45,7 +45,7 @@ export class BookingsService implements OnModuleInit {
   }
 
   // ---------------- Booking creation (saga step 1) ----------------
-  async create(customerId: string, dto: CreateBookingDto): Promise<Booking> {
+  async create(customerId: string, customerName: string | undefined, dto: CreateBookingDto): Promise<Booking> {
     const salon = await this.catalogue.getSalon(dto.salonId);
     if (salon.status !== 'active') {
       throw new BadRequestException('Salon is not accepting bookings');
@@ -89,6 +89,7 @@ export class BookingsService implements OnModuleInit {
         }
         const entity = repo.create({
           customerId,
+          customerName,
           salonId: dto.salonId,
           ownerId: salon.ownerId,
           serviceId: service.serviceId,
@@ -163,19 +164,66 @@ export class BookingsService implements OnModuleInit {
   }
 
   // ---------------- Customer-initiated cancel ----------------
+  // Allowed only BEFORE the owner approves (pending / confirmed).
   async cancel(userId: string, bookingId: string): Promise<Booking> {
     const booking = await this.repo.findOne({ where: { id: bookingId } });
     if (!booking) throw new NotFoundException('Booking not found');
     if (booking.customerId !== userId) {
       throw new ForbiddenException('Not your booking');
     }
+    if (booking.status === BookingStatus.APPROVED) {
+      throw new BadRequestException(
+        'The salon has already approved this booking, so it can no longer be cancelled. Please contact the salon.',
+      );
+    }
     if (![BookingStatus.PENDING, BookingStatus.CONFIRMED].includes(booking.status)) {
       throw new BadRequestException(`Cannot cancel a ${booking.status} booking`);
     }
+    await this.releaseWithRefund(booking, 'customer_cancelled');
+    return booking;
+  }
+
+  // ---------------- Owner: approve a confirmed booking ----------------
+  async approve(userId: string, role: string, bookingId: string): Promise<Booking> {
+    const booking = await this.findOne(bookingId);
+    if (booking.ownerId !== userId && role !== 'admin') {
+      throw new ForbiddenException('Only the salon owner can approve this booking');
+    }
+    if (booking.status !== BookingStatus.CONFIRMED) {
+      throw new BadRequestException(`Only a confirmed booking can be approved (this is ${booking.status})`);
+    }
+    booking.status = BookingStatus.APPROVED;
+    await this.repo.save(booking);
+    this.bus.publish('booking.approved', {
+      bookingId: booking.id,
+      customerId: booking.customerId,
+      salonId: booking.salonId,
+      ownerId: booking.ownerId,
+      serviceName: booking.serviceName,
+      startTime: booking.startTime,
+    });
+    this.logger.log(`Booking ${booking.id} approved by owner`);
+    return booking;
+  }
+
+  // ---------------- Owner: cancel a confirmed/approved booking ----------------
+  async ownerCancel(userId: string, role: string, bookingId: string): Promise<Booking> {
+    const booking = await this.findOne(bookingId);
+    if (booking.ownerId !== userId && role !== 'admin') {
+      throw new ForbiddenException('Only the salon owner can cancel this booking');
+    }
+    if (![BookingStatus.CONFIRMED, BookingStatus.APPROVED].includes(booking.status)) {
+      throw new BadRequestException(`Cannot cancel a ${booking.status} booking`);
+    }
+    await this.releaseWithRefund(booking, 'owner_cancelled');
+    return booking;
+  }
+
+  // Release a booking's slot and refund the customer if they had paid.
+  private async releaseWithRefund(booking: Booking, reason: string): Promise<void> {
     const wasPaid = booking.paymentStatus === PaymentStatus.PAID;
-    await this.releaseBooking(booking, 'customer_cancelled');
+    await this.releaseBooking(booking, reason);
     if (wasPaid) {
-      // Trigger refund saga in the Payment service.
       this.bus.publish('booking.cancelled', {
         bookingId: booking.id,
         customerId: booking.customerId,
@@ -185,7 +233,6 @@ export class BookingsService implements OnModuleInit {
         refund: true,
       });
     }
-    return booking;
   }
 
   // ---------------- Appointment lifecycle (owner/staff) ----------------
@@ -194,8 +241,8 @@ export class BookingsService implements OnModuleInit {
     if (booking.ownerId !== userId && role !== 'admin') {
       throw new ForbiddenException('Only the salon owner can complete this booking');
     }
-    if (booking.status !== BookingStatus.CONFIRMED) {
-      throw new BadRequestException(`Cannot complete a ${booking.status} booking`);
+    if (booking.status !== BookingStatus.APPROVED) {
+      throw new BadRequestException(`Approve the booking before completing it (this is ${booking.status})`);
     }
     booking.status = BookingStatus.COMPLETED;
     await this.repo.save(booking);
@@ -219,8 +266,8 @@ export class BookingsService implements OnModuleInit {
     if (booking.ownerId !== userId && role !== 'admin') {
       throw new ForbiddenException('Only the salon owner can mark a no-show');
     }
-    if (booking.status !== BookingStatus.CONFIRMED) {
-      throw new BadRequestException(`Cannot mark a ${booking.status} booking as no-show`);
+    if (booking.status !== BookingStatus.APPROVED) {
+      throw new BadRequestException(`Approve the booking before marking a no-show (this is ${booking.status})`);
     }
     booking.status = BookingStatus.NO_SHOW;
     await this.repo.save(booking);

@@ -9,7 +9,8 @@ import {
 
 export enum BookingStatus {
   PENDING = 'pending',       // slot held, awaiting payment
-  CONFIRMED = 'confirmed',   // payment completed
+  CONFIRMED = 'confirmed',   // payment completed, awaiting owner acceptance
+  APPROVED = 'approved',     // owner accepted the appointment
   CANCELLED = 'cancelled',
   COMPLETED = 'completed',
   NO_SHOW = 'no_show',
@@ -31,6 +32,10 @@ export class Booking {
   @Column()
   @Index()
   customerId: string;
+
+  // Captured at booking time so owners see who booked (not just an id).
+  @Column({ nullable: true })
+  customerName?: string;
 
   @Column()
   salonId: string;

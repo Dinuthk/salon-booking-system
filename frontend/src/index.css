@@ -116,8 +116,10 @@ input:focus, select:focus { outline: 2px solid #ddd6fe; border-color: var(--bran
 .badge { font-size: 12px; padding: 3px 10px; border-radius: 999px; font-weight: 700; }
 .badge.pending { background: #fef3c7; color: var(--warn); }
 .badge.confirmed { background: #dcfce7; color: var(--ok); }
+.badge.approved { background: #cffafe; color: #0e7490; }
 .badge.cancelled { background: #fee2e2; color: var(--danger); }
 .badge.completed { background: #e0e7ff; color: #4338ca; }
+.badge.no_show { background: #f3f4f6; color: #6b7280; }
 
 .slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 8px; }
 .slot {

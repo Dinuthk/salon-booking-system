@@ -66,9 +66,18 @@ export default function OwnerPage() {
     mutationFn: (id: string) => bookingApi.noShow(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['bookings', 'owner'] }),
   });
+  const approve = useMutation({
+    mutationFn: (id: string) => bookingApi.approve(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['bookings', 'owner'] }),
+  });
+  const ownerCancel = useMutation({
+    mutationFn: (id: string) => bookingApi.ownerCancel(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['bookings', 'owner'] }),
+  });
 
   const [salon, setSalon] = useState({ name: '', city: '', address: '', description: '' });
   const [svc, setSvc] = useState<Record<string, { name: string; price: string; durationMinutes: string }>>({});
+  const [svcError, setSvcError] = useState('');
 
   const createSalon = useMutation({
     mutationFn: () => salonApi.create(salon),
@@ -81,7 +90,14 @@ export default function OwnerPage() {
   const addService = useMutation({
     mutationFn: ({ salonId, body }: { salonId: string; body: any }) =>
       salonApi.addService(salonId, body),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['salons', 'mine'] }),
+    onSuccess: () => {
+      setSvcError('');
+      qc.invalidateQueries({ queryKey: ['salons', 'mine'] });
+    },
+    onError: (err: any) => {
+      const m = err?.response?.data?.message;
+      setSvcError(Array.isArray(m) ? m.join(', ') : m || 'Could not add service');
+    },
   });
 
   // Owner accounts must be approved by an admin before they can operate.
@@ -191,21 +207,26 @@ export default function OwnerPage() {
                 </div>
                 <button
                   className="btn sm"
-                  disabled={!form.name || !form.price}
-                  onClick={() =>
+                  disabled={form.name.trim().length < 2 || !form.price}
+                  onClick={() => {
+                    setSvcError('');
                     addService.mutate({
                       salonId: s._id,
                       body: {
-                        name: form.name,
+                        name: form.name.trim(),
                         price: Number(form.price),
                         durationMinutes: Number(form.durationMinutes) || 30,
                       },
-                    })
-                  }
+                    });
+                  }}
                 >
                   Add service
                 </button>
               </div>
+              <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                Service name needs at least 2 characters.
+              </p>
+              {svcError && <div className="error" style={{ marginTop: 6 }}>{svcError}</div>}
 
               {s.services.length > 0 && (
                 <div className="row" style={{ marginTop: 8 }}>
@@ -259,7 +280,11 @@ export default function OwnerPage() {
         {ownerBookings?.map((b) => (
           <div key={b.id} className="card row between">
             <div>
-              <strong>{b.serviceName}</strong>
+              <div className="row" style={{ gap: 8, alignItems: 'baseline' }}>
+                <strong style={{ fontSize: 16 }}>{b.customerName || 'Customer'}</strong>
+                <span className="muted" style={{ fontSize: 13 }}>booked</span>
+                <span className="tag">{b.serviceName}</span>
+              </div>
               <p className="muted" style={{ margin: '4px 0' }}>
                 {new Date(b.startTime).toLocaleString()} · LKR {b.price}
               </p>
@@ -268,8 +293,15 @@ export default function OwnerPage() {
               <span className={`badge ${b.status}`}>{b.status}</span>
               {b.status === 'confirmed' && (
                 <>
+                  <button className="btn sm" onClick={() => approve.mutate(b.id)}>Approve</button>
+                  <button className="btn danger sm" onClick={() => ownerCancel.mutate(b.id)}>Cancel</button>
+                </>
+              )}
+              {b.status === 'approved' && (
+                <>
                   <button className="btn sm" onClick={() => complete.mutate(b.id)}>Mark completed</button>
                   <button className="btn ghost sm" onClick={() => noShow.mutate(b.id)}>No-show</button>
+                  <button className="btn danger sm" onClick={() => ownerCancel.mutate(b.id)}>Cancel</button>
                 </>
               )}
             </div>
