@@ -45,6 +45,9 @@ export default function SalonDetailPage() {
   function onBook() {
     setError('');
     if (!user) return navigate('/login');
+    if (user.role !== 'customer') {
+      return setError('Only customers can book appointments. Owners manage salons instead.');
+    }
     if (!selectedSlot) return setError('Please pick a time slot');
     createBooking.mutate();
   }
@@ -92,7 +95,11 @@ export default function SalonDetailPage() {
 
         <div className="card">
           <h2>Book a slot</h2>
-          {!selectedService ? (
+          {user && user.role !== 'customer' ? (
+            <p className="muted">
+              Booking is a customer feature. Sign in with a customer account to reserve a slot.
+            </p>
+          ) : !selectedService ? (
             <p className="muted">Select a service to see available times.</p>
           ) : (
             <>

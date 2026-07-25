@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   Param,
   Patch,
@@ -70,6 +71,10 @@ export class BookingsController {
 
   @Post()
   create(@CurrentUser() user: GatewayUser, @Body() dto: CreateBookingDto) {
+    // Only customers can book — owners/admins manage the platform instead.
+    if (user.role !== 'customer') {
+      throw new ForbiddenException('Only customers can book appointments');
+    }
     return this.bookings.create(user.id, user.name, dto);
   }
 

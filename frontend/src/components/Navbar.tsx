@@ -16,8 +16,9 @@ export default function Navbar() {
         </Link>
         <div className="nav-spacer" />
         <Link to="/">Discover</Link>
-        {user && <Link to="/bookings">My Bookings</Link>}
-        {user && <Link to="/rewards">Rewards</Link>}
+        {/* Booking-related screens are for customers only */}
+        {user && user.role === 'customer' && <Link to="/bookings">My Bookings</Link>}
+        {user && user.role === 'customer' && <Link to="/rewards">Rewards</Link>}
         {user && <Link to="/notifications">Alerts</Link>}
         {user && (user.role === 'owner' || user.role === 'admin') && (
           <Link to="/owner">Owner</Link>
