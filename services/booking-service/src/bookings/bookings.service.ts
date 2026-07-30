@@ -147,6 +147,7 @@ export class BookingsService implements OnModuleInit {
     this.bus.publish('booking.confirmed', {
       bookingId: booking.id,
       customerId: booking.customerId,
+      customerName: booking.customerName,
       salonId: booking.salonId,
       ownerId: booking.ownerId,
       serviceName: booking.serviceName,
@@ -222,14 +223,18 @@ export class BookingsService implements OnModuleInit {
   // Release a booking's slot and refund the customer if they had paid.
   private async releaseWithRefund(booking: Booking, reason: string): Promise<void> {
     const wasPaid = booking.paymentStatus === PaymentStatus.PAID;
+    const cancelledBy = reason === 'owner_cancelled' ? 'owner' : 'customer';
     await this.releaseBooking(booking, reason);
     if (wasPaid) {
       this.bus.publish('booking.cancelled', {
         bookingId: booking.id,
         customerId: booking.customerId,
+        customerName: booking.customerName,
         salonId: booking.salonId,
         ownerId: booking.ownerId,
+        serviceName: booking.serviceName,
         amount: Number(booking.price),
+        cancelledBy,
         refund: true,
       });
     }

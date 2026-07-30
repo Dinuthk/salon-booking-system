@@ -64,6 +64,14 @@ export class ReviewsService implements OnModuleInit {
     await elig.save();
 
     await this.publishRating(elig.salonId);
+    // Notify the salon owner about the new review.
+    this.bus.publish('review.created', {
+      salonId: elig.salonId,
+      ownerId: elig.ownerId,
+      rating: dto.rating,
+      customerName: dto.customerName,
+      serviceName: elig.serviceName,
+    });
     this.logger.log(`Review ${review.id} created for salon ${elig.salonId}`);
     return review;
   }

@@ -19,7 +19,15 @@ export class NotificationsService implements OnModuleInit {
   async onModuleInit() {
     await this.bus.subscribe(
       'notification.events',
-      ['booking.confirmed', 'booking.approved', 'booking.completed', 'booking.cancelled', 'slot.freed', 'owner.registered'],
+      [
+        'booking.confirmed',
+        'booking.approved',
+        'booking.completed',
+        'booking.cancelled',
+        'slot.freed',
+        'review.created',
+        'owner.registered',
+      ],
       async (rk, p) => this.handle(rk, p),
     );
   }
@@ -38,27 +46,46 @@ export class NotificationsService implements OnModuleInit {
       }
       return;
     }
-    const spec = this.render(routingKey, p);
-    if (!spec) return;
-    await this.deliver(spec.userId, routingKey, spec.title, spec.body, p);
+    // A single event may notify several people (e.g. customer + owner).
+    for (const spec of this.specsFor(routingKey, p)) {
+      await this.deliver(spec.userId, routingKey, spec.title, spec.body, p);
+    }
   }
 
-  private render(rk: string, p: any): { userId: string; title: string; body: string } | null {
+  private specsFor(rk: string, p: any): { userId: string; title: string; body: string }[] {
+    const out: { userId: string; title: string; body: string }[] = [];
+    const who = p.customerName || 'A customer';
+    const svc = p.serviceName || 'an appointment';
     switch (rk) {
       case 'booking.confirmed':
-        return { userId: p.customerId, title: 'Booking confirmed ✅', body: 'Your appointment is confirmed. Waiting for the salon to accept it.' };
+        out.push({ userId: p.customerId, title: 'Booking confirmed ✅', body: 'Your appointment is confirmed. Waiting for the salon to accept it.' });
+        if (p.ownerId) out.push({ userId: p.ownerId, title: 'New booking 🔔', body: `${who} booked ${svc}.` });
+        break;
       case 'booking.approved':
-        return { userId: p.customerId, title: 'Salon accepted your booking 🎉', body: `The salon approved your ${p.serviceName || 'appointment'}. It can no longer be cancelled online.` };
+        out.push({ userId: p.customerId, title: 'Salon accepted your booking 🎉', body: `The salon approved your ${svc}. It can no longer be cancelled online.` });
+        break;
       case 'booking.completed':
-        return { userId: p.customerId, title: 'Thanks for visiting 💜', body: `Hope you enjoyed your ${p.serviceName || 'appointment'}. Leave a review!` };
+        out.push({ userId: p.customerId, title: 'Thanks for visiting 💜', body: `Hope you enjoyed your ${svc}. Leave a review!` });
+        break;
       case 'booking.cancelled':
-        return { userId: p.customerId, title: 'Booking cancelled', body: p.refund ? 'Your booking was cancelled and a refund is on its way.' : 'Your booking was cancelled.' };
+        out.push({ userId: p.customerId, title: 'Booking cancelled', body: p.refund ? 'Your booking was cancelled and a refund is on its way.' : 'Your booking was cancelled.' });
+        // Tell the owner only when the customer cancelled (not the owner themselves).
+        if (p.cancelledBy === 'customer' && p.ownerId) {
+          out.push({ userId: p.ownerId, title: 'Booking cancelled ❌', body: `${who} cancelled their ${svc}.` });
+        }
+        break;
       case 'slot.freed':
-        if (p.reason !== 'payment_timeout' || !p.customerId) return null;
-        return { userId: p.customerId, title: 'Reservation expired', body: 'We released your held slot because payment was not completed in time.' };
-      default:
-        return null;
+        if (p.reason === 'payment_timeout' && p.customerId) {
+          out.push({ userId: p.customerId, title: 'Reservation expired', body: 'We released your held slot because payment was not completed in time.' });
+        }
+        break;
+      case 'review.created':
+        if (p.ownerId) {
+          out.push({ userId: p.ownerId, title: `New ${p.rating}★ review ⭐`, body: `${who} reviewed your salon${p.serviceName ? ` (${p.serviceName})` : ''}.` });
+        }
+        break;
     }
+    return out;
   }
 
   /** Simulate multi-channel delivery with fallback until one channel succeeds. */
